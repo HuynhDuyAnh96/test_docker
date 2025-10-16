@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    container_name: my_postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  web:
+    build: .
+    container_name: php_web
+    restart: unless-stopped
+    ports:
+      - "8080:80"   # truy cập web ở http://localhost:8080
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASS: ${POSTGRES_PASSWORD}
+    depends_on:
+      - db
+    networks:
+      - app-network
+    volumes:
+      - ./src:/var/www/html  # mount source để thay đổi code không cần rebuild
+
+volumes:
+  pgdata:
+
+networks:
+  app-network:
+    driver: bridge
