@@ -1,0 +1,63 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: cimg/base:stable   # Image môi trường CircleCI (Ubuntu)
+    steps:
+      - checkout                  # Lấy code từ repo
+
+      - setup_remote_docker:      # Cho phép chạy Docker bên trong CircleCI
+          docker_layer_caching: true
+
+      - run:
+          name: Kiểm tra Dockerfile
+          command: docker build -t web-app . --target=final || exit 1
+
+      - run:
+          name: Build Docker Compose (Web + PostgreSQL)
+          command: docker-compose -f docker-compose.yml build
+
+      - run:
+          name: Chạy ứng dụng bằng docker-compose
+          command: |
+            docker-compose up -d
+            sleep 15  # chờ database khởi động
+            docker ps
+
+      - run:
+          name: Kiểm tra web hoạt động
+          command: |
+            curl -f http://localhost:8080 || (echo "Web không chạy!" && exit 1)
+
+      - run:
+          name: Dừng container
+          command: docker-compose down
+
+  # (Tùy chọn) Job deploy lên server
+  deploy:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build image
+          command: docker build -t yourname/hello-php:latest .
+      - run:
+          name: Đăng nhập Docker Hub và đẩy image (tuỳ chọn)
+          command: |
+            echo $DOCKERHUB_PASS | docker login -u $DOCKERHUB_USER --password-stdin
+            docker push yourname/hello-php:latest
+
+workflows:
+  version: 2
+  build_and_deploy:
+    jobs:
+      - build
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only: main   # chỉ deploy khi push lên nhánh main
